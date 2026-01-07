@@ -6,11 +6,17 @@ import { google } from "@ai-sdk/google";
 const args = Bun.argv.slice(2);
 
 if (args.length === 0) {
-  console.error("Usage: bun run index.ts <pdf-file-path>");
+  console.error("Usage: bun run index.ts <pdf-file-path> [output-path]");
   process.exit(1);
 }
 
 const pdfFilePath = args[0]!;
+// Optional second argument is treated as the output path for the generated Markdown
+const outputPathArg = args[1]?.trim();
+const outputPathDefault = "output.md";
+const outputPath =
+  outputPathArg && outputPathArg.length > 0 ? outputPathArg : outputPathDefault;
+
 const pdfFile = Bun.file(pdfFilePath);
 
 if (!(await pdfFile.exists())) {
@@ -120,8 +126,7 @@ for await (const chunk of result.textStream) {
 
 console.log("\n");
 
-// Save the markdown to output.md
-const outputPath = "output.md";
+// Use the resolved outputPath (either provided by the user or the default)
 await Bun.write(outputPath, markdownContent);
 
 console.log(`✅ Markdown saved to ${outputPath}`);
