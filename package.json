@@ -1,0 +1,17 @@
+{
+  "name": "pdf-to-markdown",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^3.0.6",
+    "@openrouter/ai-sdk-provider": "^1.5.4",
+    "ai": "^6.0.17",
+    "pdf-parse": "^2.4.5"
+  }
+}
