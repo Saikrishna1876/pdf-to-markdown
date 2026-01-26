@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as p from "@clack/prompts";
 import { existsSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import { extname, basename, dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { convert } from "./convert";
@@ -45,7 +46,7 @@ async function runSetup() {
   const hasGlobalEnv = existsSync(globalEnvPath);
 
   if (hasLocalEnv) {
-    const fileContent = await Bun.file(envPath).text();
+    const fileContent = await readFile(envPath, "utf8");
     if (fileContent.includes("GOOGLE_GENERATIVE_AI_API_KEY")) {
       p.note(
         `Found existing configuration in:\n${envPath}`,
@@ -130,7 +131,7 @@ async function runSetup() {
   const envContent = `GOOGLE_GENERATIVE_AI_API_KEY=${apiKey}\n`;
 
   try {
-    await Bun.write(targetPath, envContent);
+    await writeFile(targetPath, envContent);
     p.note(`API key saved to:\n${targetPath}`, "Setup complete");
     p.outro("You can now run: f2md document.pdf");
   } catch (error) {
@@ -152,7 +153,7 @@ async function getApiKey(): Promise<string | undefined> {
   // Check local .env
   const localEnvPath = join(process.cwd(), ".env");
   if (existsSync(localEnvPath)) {
-    const content = await Bun.file(localEnvPath).text();
+    const content = await readFile(localEnvPath, "utf8");
     const match = content.match(/GOOGLE_GENERATIVE_AI_API_KEY=(.+)/);
     if (match?.[1]) {
       return match[1].trim();
@@ -162,7 +163,7 @@ async function getApiKey(): Promise<string | undefined> {
   // Check global .env
   const globalEnvPath = join(homedir(), ".f2md.env");
   if (existsSync(globalEnvPath)) {
-    const content = await Bun.file(globalEnvPath).text();
+    const content = await readFile(globalEnvPath, "utf8");
     const match = content.match(/GOOGLE_GENERATIVE_AI_API_KEY=(.+)/);
     if (match?.[1]) {
       return match[1].trim();

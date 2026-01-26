@@ -3,6 +3,7 @@ import { PDFParse } from "pdf-parse";
 import { google } from "@ai-sdk/google";
 import { dirname, join, extname } from "node:path";
 import { existsSync, unlinkSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import mammoth from "mammoth";
 
 export interface ConvertOptions {
@@ -19,22 +20,22 @@ export interface ConvertResult {
 export async function convert(
   inputFilePath: string,
   outputPath: string,
-  options: ConvertOptions = {}
+  options: ConvertOptions = {},
 ): Promise<ConvertResult> {
   const { onProgress = () => {}, respectPages = false } = options;
 
-  const inputFile = Bun.file(inputFilePath);
-
-  if (!(await inputFile.exists())) {
+  if (!existsSync(inputFilePath)) {
     throw new Error(`File not found: ${inputFilePath}`);
   }
+
+  const inputBuffer = await readFile(inputFilePath);
 
   const fileExtension = extname(inputFilePath).toLowerCase();
   const supportedExtensions = [".pdf", ".docx"];
 
   if (!supportedExtensions.includes(fileExtension)) {
     throw new Error(
-      `Unsupported file type: ${fileExtension}. Supported: PDF (.pdf), DOCX (.docx)`
+      `Unsupported file type: ${fileExtension}. Supported: PDF (.pdf), DOCX (.docx)`,
     );
   }
 
@@ -56,10 +57,12 @@ export async function convert(
   }> = [];
 
   if (fileExtension === ".pdf") {
-    const parser = new PDFParse({ data: await inputFile.arrayBuffer() });
+    const parser = new PDFParse({ data: inputBuffer });
 
     onProgress("Extracting pages from PDF...");
-    const { pages: screenshotPages } = await parser.getScreenshot({ scale: 1.5 });
+    const { pages: screenshotPages } = await parser.getScreenshot({
+      scale: 1.5,
+    });
     const { pages: textPages } = await parser.getText();
     const { pages: imagePages } = await parser.getImage();
 
@@ -81,7 +84,7 @@ export async function convert(
           if (image && image.data) {
             const filename = `image_${globalImageIndex + 1}.png`;
             const filepath = join(outputDir, filename);
-            await Bun.write(filepath, image.data);
+            await writeFile(filepath, image.data);
             savedImages.push({
               pageNumber: pageIndex + 1,
               imageIndex,
@@ -112,7 +115,7 @@ export async function convert(
   } else if (fileExtension === ".docx") {
     onProgress("Extracting content from DOCX...");
 
-    const docxBuffer = Buffer.from(await inputFile.arrayBuffer());
+    const docxBuffer = inputBuffer;
 
     const textResult = await mammoth.extractRawText({ buffer: docxBuffer });
     const rawText = textResult.value;
@@ -128,7 +131,7 @@ export async function convert(
           const extension = image.contentType.split("/")[1] || "png";
           const filename = `image_${globalImageIndex + 1}.${extension}`;
           const filepath = join(outputDir, filename);
-          await Bun.write(filepath, imageBuffer);
+          await writeFile(filepath, imageBuffer);
           savedImages.push({
             pageNumber: 1,
             imageIndex: globalImageIndex,
@@ -136,13 +139,13 @@ export async function convert(
           });
           globalImageIndex++;
           return { src: filename };
-        }
+        },
       ),
     };
 
     const resultWithImages = await mammoth.convertToHtml(
       { buffer: docxBuffer },
-      imageOptions
+      imageOptions,
     );
     const htmlWithImages = resultWithImages.value;
 
@@ -221,12 +224,11 @@ export async function convert(
     markdownContent += chunk;
   }
 
-  await Bun.write(outputPath, markdownContent);
+  await writeFile(outputPath, markdownContent);
 
   onProgress("Cleaning up unused images...");
 
-  const markdownFile = Bun.file(outputPath);
-  const markdownText = await markdownFile.text();
+  const markdownText = markdownContent;
 
   const imageRegex = /!\[.*?\]\(([^)]+\.(png|jpg|jpeg|gif|webp))\)/gi;
   const usedImages = new Set<string>();
