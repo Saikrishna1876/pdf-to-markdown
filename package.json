@@ -1,6 +1,6 @@
 {
   "name": "f2md",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Convert PDF and DOCX files to Markdown using AI",
   "type": "module",
   "bin": {
@@ -32,9 +32,6 @@
   ],
   "author": "",
   "license": "MIT",
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
   "peerDependencies": {
     "typescript": "^5"
   },
