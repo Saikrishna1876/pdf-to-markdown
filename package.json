@@ -1,7 +1,38 @@
 {
   "name": "file-to-markdown",
-  "module": "index.ts",
+  "version": "1.0.0",
+  "description": "Convert PDF and DOCX files to Markdown using AI",
   "type": "module",
+  "bin": {
+    "file-to-markdown": "./dist/cli.js",
+    "f2md": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "bun build ./src/cli.ts ./src/index.ts --outdir ./dist --target node --external '@clack/*' --external 'ai' --external '@ai-sdk/*' --external 'pdf-parse' --external 'mammoth' --external '@openrouter/*'",
+    "dev": "bun run ./src/cli.ts",
+    "prepublishOnly": "bun run build"
+  },
+  "keywords": [
+    "pdf",
+    "docx",
+    "markdown",
+    "converter",
+    "ai",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT",
   "devDependencies": {
     "@types/bun": "latest"
   },
@@ -10,6 +41,8 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.6",
+    "@clack/core": "^0.5.0",
+    "@clack/prompts": "^0.11.0",
     "@openrouter/ai-sdk-provider": "^1.5.4",
     "ai": "^6.0.17",
     "mammoth": "^1.11.0",
