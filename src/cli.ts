@@ -9,18 +9,18 @@ const VERSION = "1.0.0";
 
 function showHelp() {
   console.log(`
-file-to-markdown v${VERSION}
+f2md v${VERSION}
 
 Convert PDF and DOCX files to Markdown using AI.
 
 Usage:
-  file-to-markdown [input-file] [output-file]
+  f2md [input-file] [output-file]
   f2md [input-file] [output-file]
 
 Examples:
-  file-to-markdown                      # Interactive mode
-  file-to-markdown document.pdf         # Convert to document.md
-  file-to-markdown doc.pdf output.md    # Convert to output.md
+  f2md                      # Interactive mode
+  f2md document.pdf         # Convert to document.md
+  f2md doc.pdf output.md    # Convert to output.md
 
 Commands:
   setup                                 # Configure Google AI API key
@@ -35,10 +35,10 @@ Environment Variables:
 }
 
 async function runSetup() {
-  p.intro("Setup file-to-markdown");
+  p.intro("Setup f2md");
 
   const envPath = join(process.cwd(), ".env");
-  const globalEnvPath = join(homedir(), ".file-to-markdown.env");
+  const globalEnvPath = join(homedir(), ".f2md.env");
 
   // Check if .env already exists
   const hasLocalEnv = existsSync(envPath);
@@ -47,7 +47,10 @@ async function runSetup() {
   if (hasLocalEnv) {
     const fileContent = await Bun.file(envPath).text();
     if (fileContent.includes("GOOGLE_GENERATIVE_AI_API_KEY")) {
-      p.note(`Found existing configuration in:\n${envPath}`, "Already configured");
+      p.note(
+        `Found existing configuration in:\n${envPath}`,
+        "Already configured",
+      );
 
       const shouldOverwrite = await p.confirm({
         message: "Do you want to update your API key?",
@@ -60,7 +63,10 @@ async function runSetup() {
       }
     }
   } else if (hasGlobalEnv) {
-    p.note(`Found existing global configuration in:\n${globalEnvPath}`, "Already configured");
+    p.note(
+      `Found existing global configuration in:\n${globalEnvPath}`,
+      "Already configured",
+    );
 
     const shouldOverwrite = await p.confirm({
       message: "Do you want to update your API key?",
@@ -79,7 +85,7 @@ async function runSetup() {
       "2. Sign in with your Google account\n" +
       "3. Click 'Create API Key'\n" +
       "4. Copy the generated key",
-    "How to get an API key"
+    "How to get an API key",
   );
 
   const apiKey = await p.password({
@@ -109,7 +115,7 @@ async function runSetup() {
       },
       {
         value: "global",
-        label: `Home directory (~/.file-to-markdown.env)`,
+        label: `Home directory (~/.f2md.env)`,
         hint: "For all projects",
       },
     ],
@@ -126,12 +132,12 @@ async function runSetup() {
   try {
     await Bun.write(targetPath, envContent);
     p.note(`API key saved to:\n${targetPath}`, "Setup complete");
-    p.outro("You can now run: file-to-markdown document.pdf");
+    p.outro("You can now run: f2md document.pdf");
   } catch (error) {
     p.cancel(
       error instanceof Error
         ? `Failed to save configuration: ${error.message}`
-        : "Failed to save configuration"
+        : "Failed to save configuration",
     );
     process.exit(1);
   }
@@ -154,7 +160,7 @@ async function getApiKey(): Promise<string | undefined> {
   }
 
   // Check global .env
-  const globalEnvPath = join(homedir(), ".file-to-markdown.env");
+  const globalEnvPath = join(homedir(), ".f2md.env");
   if (existsSync(globalEnvPath)) {
     const content = await Bun.file(globalEnvPath).text();
     const match = content.match(/GOOGLE_GENERATIVE_AI_API_KEY=(.+)/);
@@ -188,12 +194,12 @@ async function main() {
   // Check for API key before proceeding
   const apiKey = await getApiKey();
   if (!apiKey) {
-    p.intro("file-to-markdown");
+    p.intro("f2md");
     p.cancel(
       "Google AI API key not found.\n\n" +
         "Run setup to configure your API key:\n" +
-        "  file-to-markdown setup\n\n" +
-        "Or set the GOOGLE_GENERATIVE_AI_API_KEY environment variable."
+        "  f2md setup\n\n" +
+        "Or set the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
     );
     process.exit(1);
   }
@@ -201,7 +207,7 @@ async function main() {
   // Set the API key in the environment for the convert function
   process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
 
-  p.intro("file-to-markdown");
+  p.intro("f2md");
 
   let inputFilePath: string;
   let outputPath: string | undefined;
@@ -263,7 +269,9 @@ async function main() {
 
   const fileExtension = extname(inputFilePath).toLowerCase();
   if (![".pdf", ".docx"].includes(fileExtension)) {
-    p.cancel(`Unsupported file type: ${fileExtension}. Only PDF and DOCX files are supported.`);
+    p.cancel(
+      `Unsupported file type: ${fileExtension}. Only PDF and DOCX files are supported.`,
+    );
     process.exit(1);
   }
 
@@ -293,7 +301,7 @@ async function main() {
         `Images saved: ${result.imagesSaved}`,
         `Images cleaned up: ${result.imagesDeleted}`,
       ].join("\n"),
-      "Conversion complete"
+      "Conversion complete",
     );
 
     p.outro("Done!");

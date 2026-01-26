@@ -1,10 +1,9 @@
 {
-  "name": "file-to-markdown",
+  "name": "f2md",
   "version": "1.0.0",
   "description": "Convert PDF and DOCX files to Markdown using AI",
   "type": "module",
   "bin": {
-    "file-to-markdown": "./dist/cli.js",
     "f2md": "./dist/cli.js"
   },
   "main": "./dist/index.js",
