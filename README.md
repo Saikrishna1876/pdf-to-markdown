@@ -1,4 +1,4 @@
-# pdf-to-markdown
+# file-to-markdown
 
 A small Bun-based script that converts PDF and DOCX files to Markdown while preserving text and attempting to keep tables intact.
 

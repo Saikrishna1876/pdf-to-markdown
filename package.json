@@ -1,5 +1,5 @@
 {
-  "name": "pdf-to-markdown",
+  "name": "file-to-markdown",
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
