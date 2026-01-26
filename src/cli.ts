@@ -2,6 +2,7 @@
 import * as p from "@clack/prompts";
 import { existsSync } from "node:fs";
 import { extname, basename, dirname, join } from "node:path";
+import { homedir } from "node:os";
 import { convert } from "./convert";
 
 const VERSION = "1.0.0";
@@ -21,6 +22,9 @@ Examples:
   file-to-markdown document.pdf         # Convert to document.md
   file-to-markdown doc.pdf output.md    # Convert to output.md
 
+Commands:
+  setup                                 # Configure Google AI API key
+
 Options:
   -h, --help     Show this help message
   -v, --version  Show version number
@@ -30,10 +34,142 @@ Environment Variables:
 `);
 }
 
+async function runSetup() {
+  p.intro("Setup file-to-markdown");
+
+  const envPath = join(process.cwd(), ".env");
+  const globalEnvPath = join(homedir(), ".file-to-markdown.env");
+
+  // Check if .env already exists
+  const hasLocalEnv = existsSync(envPath);
+  const hasGlobalEnv = existsSync(globalEnvPath);
+
+  if (hasLocalEnv) {
+    const fileContent = await Bun.file(envPath).text();
+    if (fileContent.includes("GOOGLE_GENERATIVE_AI_API_KEY")) {
+      p.note(`Found existing configuration in:\n${envPath}`, "Already configured");
+
+      const shouldOverwrite = await p.confirm({
+        message: "Do you want to update your API key?",
+        initialValue: false,
+      });
+
+      if (p.isCancel(shouldOverwrite) || !shouldOverwrite) {
+        p.cancel("Setup cancelled");
+        process.exit(0);
+      }
+    }
+  } else if (hasGlobalEnv) {
+    p.note(`Found existing global configuration in:\n${globalEnvPath}`, "Already configured");
+
+    const shouldOverwrite = await p.confirm({
+      message: "Do you want to update your API key?",
+      initialValue: false,
+    });
+
+    if (p.isCancel(shouldOverwrite) || !shouldOverwrite) {
+      p.cancel("Setup cancelled");
+      process.exit(0);
+    }
+  }
+
+  p.note(
+    "To get your Google AI API key:\n" +
+      "1. Visit: https://aistudio.google.com/apikey\n" +
+      "2. Sign in with your Google account\n" +
+      "3. Click 'Create API Key'\n" +
+      "4. Copy the generated key",
+    "How to get an API key"
+  );
+
+  const apiKey = await p.password({
+    message: "Enter your Google AI API key:",
+    validate: (value) => {
+      if (!value || value.trim().length === 0) {
+        return "API key is required";
+      }
+      if (value.trim().length < 20) {
+        return "API key seems too short. Please check and try again.";
+      }
+    },
+  });
+
+  if (p.isCancel(apiKey)) {
+    p.cancel("Setup cancelled");
+    process.exit(0);
+  }
+
+  const scope = await p.select({
+    message: "Where should the API key be saved?",
+    options: [
+      {
+        value: "local",
+        label: "Current directory (.env)",
+        hint: "Only for this project",
+      },
+      {
+        value: "global",
+        label: `Home directory (~/.file-to-markdown.env)`,
+        hint: "For all projects",
+      },
+    ],
+  });
+
+  if (p.isCancel(scope)) {
+    p.cancel("Setup cancelled");
+    process.exit(0);
+  }
+
+  const targetPath = scope === "global" ? globalEnvPath : envPath;
+  const envContent = `GOOGLE_GENERATIVE_AI_API_KEY=${apiKey}\n`;
+
+  try {
+    await Bun.write(targetPath, envContent);
+    p.note(`API key saved to:\n${targetPath}`, "Setup complete");
+    p.outro("You can now run: file-to-markdown document.pdf");
+  } catch (error) {
+    p.cancel(
+      error instanceof Error
+        ? `Failed to save configuration: ${error.message}`
+        : "Failed to save configuration"
+    );
+    process.exit(1);
+  }
+}
+
+async function getApiKey(): Promise<string | undefined> {
+  // Check environment variable
+  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    return process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  }
+
+  // Check local .env
+  const localEnvPath = join(process.cwd(), ".env");
+  if (existsSync(localEnvPath)) {
+    const content = await Bun.file(localEnvPath).text();
+    const match = content.match(/GOOGLE_GENERATIVE_AI_API_KEY=(.+)/);
+    if (match?.[1]) {
+      return match[1].trim();
+    }
+  }
+
+  // Check global .env
+  const globalEnvPath = join(homedir(), ".file-to-markdown.env");
+  if (existsSync(globalEnvPath)) {
+    const content = await Bun.file(globalEnvPath).text();
+    const match = content.match(/GOOGLE_GENERATIVE_AI_API_KEY=(.+)/);
+    if (match?.[1]) {
+      return match[1].trim();
+    }
+  }
+
+  return undefined;
+}
+
 async function main() {
   const args = process.argv.slice(2);
 
-  // Handle flags
+  // Handle flags and commands
   if (args.includes("-h") || args.includes("--help")) {
     showHelp();
     process.exit(0);
@@ -43,6 +179,27 @@ async function main() {
     console.log(VERSION);
     process.exit(0);
   }
+
+  if (args[0] === "setup") {
+    await runSetup();
+    process.exit(0);
+  }
+
+  // Check for API key before proceeding
+  const apiKey = await getApiKey();
+  if (!apiKey) {
+    p.intro("file-to-markdown");
+    p.cancel(
+      "Google AI API key not found.\n\n" +
+        "Run setup to configure your API key:\n" +
+        "  file-to-markdown setup\n\n" +
+        "Or set the GOOGLE_GENERATIVE_AI_API_KEY environment variable."
+    );
+    process.exit(1);
+  }
+
+  // Set the API key in the environment for the convert function
+  process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
 
   p.intro("file-to-markdown");
 
