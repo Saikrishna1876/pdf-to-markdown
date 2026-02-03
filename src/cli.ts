@@ -7,21 +7,23 @@ import { homedir } from "node:os";
 import { convert } from "./convert";
 
 const VERSION = "1.0.0";
+const SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
+const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
 
 function showHelp() {
   console.log(`
 f2md v${VERSION}
 
-Convert PDF and DOCX files to Markdown using AI.
+Convert PDF, DOCX, and image files to Markdown using AI.
 
 Usage:
-  f2md [input-file] [output-file]
   f2md [input-file] [output-file]
 
 Examples:
   f2md                      # Interactive mode
   f2md document.pdf         # Convert to document.md
   f2md doc.pdf output.md    # Convert to output.md
+  f2md image.png            # Extract text from image to image.md
 
 Commands:
   setup                                 # Configure Google AI API key
@@ -29,6 +31,11 @@ Commands:
 Options:
   -h, --help     Show this help message
   -v, --version  Show version number
+
+Supported file types:
+  - PDF (.pdf)
+  - DOCX (.docx)
+  - Images (.png, .jpg, .jpeg, .gif, .webp) - OCR text extraction
 
 Environment Variables:
   GOOGLE_GENERATIVE_AI_API_KEY  Required. Your Google AI API key.
@@ -220,7 +227,7 @@ async function main() {
   } else {
     // Interactive mode
     const inputResult = await p.text({
-      message: "Enter the path to your PDF or DOCX file:",
+      message: "Enter the path to your file (PDF, DOCX, or image):",
       placeholder: "./document.pdf",
       validate: (value) => {
         if (!value || value.trim().length === 0) {
@@ -230,8 +237,8 @@ async function main() {
           return `File not found: ${value}`;
         }
         const ext = extname(value.trim()).toLowerCase();
-        if (![".pdf", ".docx"].includes(ext)) {
-          return "Only PDF and DOCX files are supported";
+        if (!SUPPORTED_EXTENSIONS.includes(ext)) {
+          return "Supported formats: PDF, DOCX, PNG, JPG, JPEG, GIF, WEBP";
         }
       },
     });
@@ -269,12 +276,14 @@ async function main() {
   }
 
   const fileExtension = extname(inputFilePath).toLowerCase();
-  if (![".pdf", ".docx"].includes(fileExtension)) {
+  if (!SUPPORTED_EXTENSIONS.includes(fileExtension)) {
     p.cancel(
-      `Unsupported file type: ${fileExtension}. Only PDF and DOCX files are supported.`,
+      `Unsupported file type: ${fileExtension}. Supported formats: PDF, DOCX, PNG, JPG, JPEG, GIF, WEBP`,
     );
     process.exit(1);
   }
+
+  const isImageFile = IMAGE_EXTENSIONS.includes(fileExtension);
 
   // Set default output path if not provided
   if (!outputPath || outputPath.trim().length === 0) {
@@ -296,13 +305,15 @@ async function main() {
 
     spinner.stop(`Converted ${basename(inputFilePath)}`);
 
+    const noteLines = [`Output: ${result.outputPath}`];
+    if (!isImageFile) {
+      noteLines.push(`Images saved: ${result.imagesSaved}`);
+      noteLines.push(`Images cleaned up: ${result.imagesDeleted}`);
+    }
+
     p.note(
-      [
-        `Output: ${result.outputPath}`,
-        `Images saved: ${result.imagesSaved}`,
-        `Images cleaned up: ${result.imagesDeleted}`,
-      ].join("\n"),
-      "Conversion complete",
+      noteLines.join("\n"),
+      isImageFile ? "Text extraction complete" : "Conversion complete",
     );
 
     p.outro("Done!");
