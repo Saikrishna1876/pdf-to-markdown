@@ -1,11 +1,12 @@
 # f2md
 
-Convert PDF and DOCX files to Markdown using AI. This CLI tool extracts text, images, and preserves table structure while converting documents to clean, well-formatted Markdown.
+Convert PDF, DOCX, and image files to Markdown using AI. This CLI tool extracts text, images, and preserves table structure while converting documents to clean, well-formatted Markdown. It also supports OCR text extraction from images.
 
 ## Features
 
 - **PDF Support** - Full text extraction, image extraction, and page screenshots for layout understanding
 - **DOCX Support** - Text and image extraction with structure preservation
+- **Image OCR** - Extract text from images (PNG, JPG, JPEG, GIF, WEBP) using AI-powered OCR
 - **AI-Powered Conversion** - Uses Google's Gemini AI to intelligently convert content to Markdown
 - **Interactive CLI** - Friendly prompts using clack.js
 - **Easy Setup** - Built-in configuration wizard for API keys
@@ -80,7 +81,7 @@ f2md
 
 The tool will prompt you for:
 
-- Input file path
+- Input file path (PDF, DOCX, or image)
 - Output file path
 
 ### CLI Mode
@@ -92,14 +93,18 @@ f2md document.pdf
 # Convert with custom output path
 f2md document.pdf output.md
 
-# Using the short alias
-f2md document.pdf
+# Extract text from an image (OCR)
+f2md screenshot.png
+
+# Extract text from image with custom output
+f2md image.jpg output.md
 ```
 
 ### Supported File Types
 
 - PDF (`.pdf`)
 - Word Documents (`.docx`)
+- Images (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`) - OCR text extraction
 
 ## Options
 
@@ -111,11 +116,21 @@ f2md setup      # Configure API key
 
 ## How It Works
 
+### For PDF and DOCX files:
+
 1. **Extraction** - Reads the input file and extracts text, images, and layout information
 2. **Processing** - For PDFs, captures page screenshots to understand visual layout
 3. **AI Conversion** - Sends extracted content to Google's Gemini AI model
 4. **Markdown Generation** - Receives AI-generated Markdown with proper formatting
 5. **Cleanup** - Removes unused images and saves the final output
+
+### For Image files:
+
+1. **Image Processing** - Reads the image file and encodes it for AI processing
+2. **OCR Analysis** - Sends the image to Google's Gemini AI with specialized prompts for text extraction
+3. **Text Extraction** - AI extracts all visible text while preserving structure (headings, lists, tables)
+4. **Markdown Generation** - Converts extracted content to well-formatted Markdown
+5. **Output** - Saves the final Markdown file
 
 ## Development
 
