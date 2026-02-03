@@ -31,11 +31,12 @@ export async function convert(
   const inputBuffer = await readFile(inputFilePath);
 
   const fileExtension = extname(inputFilePath).toLowerCase();
-  const supportedExtensions = [".pdf", ".docx"];
+  const supportedExtensions = [".pdf", ".docx", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
+  const imageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
 
   if (!supportedExtensions.includes(fileExtension)) {
     throw new Error(
-      `Unsupported file type: ${fileExtension}. Supported: PDF (.pdf), DOCX (.docx)`,
+      `Unsupported file type: ${fileExtension}. Supported: PDF (.pdf), DOCX (.docx), Images (.png, .jpg, .jpeg, .gif, .webp)`,
     );
   }
 
@@ -157,11 +158,38 @@ export async function convert(
       imageBase64: null,
       imageFilenames: savedImages.map((img) => img.filename),
     });
+  } else if (imageExtensions.includes(fileExtension)) {
+    onProgress("Processing image file for text extraction...");
+
+    const mimeTypeMap: Record<string, string> = {
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".gif": "image/gif",
+      ".webp": "image/webp",
+    };
+
+    const mimeType = mimeTypeMap[fileExtension] || "image/png";
+    const imageBase64 = inputBuffer.toString("base64");
+
+    pageContents.push({
+      pageNumber: 1,
+      text: "",
+      imageBase64,
+      imageFilenames: [],
+    });
+
+    // Store the mime type for later use
+    (pageContents[0] as { mimeType?: string }).mimeType = mimeType;
   }
 
   let initialInstruction: string;
+  const isImageFile = imageExtensions.includes(fileExtension);
 
-  if (fileExtension === ".docx") {
+  if (isImageFile) {
+    initialInstruction =
+      "Extract all text content from the following image and convert it to a well-formatted Markdown document. Accurately capture all text, preserving structure including headings, lists, tables, and any formatting visible in the image. If the image contains diagrams, charts, or non-text elements, describe them briefly. Output ONLY the markdown content, no explanations.";
+  } else if (fileExtension === ".docx") {
     initialInstruction =
       "Convert the following DOCX document content to a well-formatted Markdown document. I will provide the extracted HTML and raw text content. Convert this to clean Markdown, preserving the structure including headings, lists, tables, and any special formatting. I have also extracted embedded images from the document and saved them as separate files. Include images in the markdown using the format ![alt text](filename). Output ONLY the markdown content, no explanations.";
   } else {
@@ -181,35 +209,40 @@ export async function convert(
   ];
 
   for (const page of pageContents) {
-    userContent.push({
-      type: "text",
-      text: `\n--- Page ${page.pageNumber} ---\nExtracted text:\n${
-        page.text || "(No text extracted)"
-      }${
-        page.imageFilenames.length > 0
-          ? `\n\nExtracted images on this page: ${page.imageFilenames.join(", ")}`
-          : ""
-      }`,
-    });
+    // For image files, skip the page header text
+    if (!isImageFile) {
+      userContent.push({
+        type: "text",
+        text: `\n--- Page ${page.pageNumber} ---\nExtracted text:\n${
+          page.text || "(No text extracted)"
+        }${
+          page.imageFilenames.length > 0
+            ? `\n\nExtracted images on this page: ${page.imageFilenames.join(", ")}`
+            : ""
+        }`,
+      });
+    }
 
     if (page.imageBase64) {
+      const pageMimeType = (page as { mimeType?: string }).mimeType || "image/png";
       userContent.push({
         type: "image",
         image: page.imageBase64,
-        mimeType: "image/png",
+        mimeType: pageMimeType,
       });
     }
   }
 
-  onProgress("Converting to markdown with AI...");
+  onProgress(isImageFile ? "Extracting text from image with AI..." : "Converting to markdown with AI...");
 
   const result = streamText({
     model: google("gemini-2.5-flash"),
     messages: [
       {
         role: "system",
-        content:
-          "You are an expert at converting PDF and DOCX content to clean, well-structured Markdown. You accurately preserve tables, headings, lists, and formatting. You use proper Markdown syntax including tables with pipes and dashes, headers with #, lists with - or *, and code blocks with backticks when appropriate.",
+        content: isImageFile
+          ? "You are an expert at extracting text from images (OCR) and converting it to clean, well-structured Markdown. You accurately capture all visible text while preserving structure including headings, lists, tables, and formatting. You use proper Markdown syntax including tables with pipes and dashes, headers with #, lists with - or *, and code blocks with backticks when appropriate."
+          : "You are an expert at converting PDF and DOCX content to clean, well-structured Markdown. You accurately preserve tables, headings, lists, and formatting. You use proper Markdown syntax including tables with pipes and dashes, headers with #, lists with - or *, and code blocks with backticks when appropriate.",
       },
       {
         role: "user",
