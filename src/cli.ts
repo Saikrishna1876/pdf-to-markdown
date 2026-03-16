@@ -29,8 +29,9 @@ Commands:
   setup                                 # Configure Google AI API key
 
 Options:
-  -h, --help     Show this help message
-  -v, --version  Show version number
+  -h, --help           Show this help message
+  -v, --version        Show version number
+  -p, --respect-pages  Treat each PDF page as a separate section (default: merge into single document)
 
 Supported file types:
   - PDF (.pdf)
@@ -194,6 +195,8 @@ async function main() {
     process.exit(0);
   }
 
+  const respectPages = args.includes("-p") || args.includes("--respect-pages");
+
   if (args[0] === "setup") {
     await runSetup();
     process.exit(0);
@@ -301,6 +304,7 @@ async function main() {
       onProgress: (message: string) => {
         spinner.message(message);
       },
+      respectPages,
     });
 
     spinner.stop(`Converted ${basename(inputFilePath)}`);
