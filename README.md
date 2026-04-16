@@ -8,6 +8,7 @@ Convert PDF, DOCX, and image files to Markdown using AI. This CLI tool extracts 
 - **DOCX Support** - Text and image extraction with structure preservation
 - **Image OCR** - Extract text from images (PNG, JPG, JPEG, GIF, WEBP) using AI-powered OCR
 - **AI-Powered Conversion** - Uses Google's Gemini AI to intelligently convert content to Markdown
+- **Configurable Model** - Choose which Gemini model to use via `.env`
 - **Interactive CLI** - Friendly prompts using clack.js
 - **Easy Setup** - Built-in configuration wizard for API keys
 
@@ -55,21 +56,26 @@ The setup wizard will:
 
 1. Show you where to get a Google AI API key (https://aistudio.google.com/apikey)
 2. Prompt you to enter your API key
-3. Ask where to save it (local project or global for all projects)
+3. Prompt you to enter the Gemini model to use (default: `gemini-2.5-flash`)
+4. Ask where to save it (local project or global for all projects)
 
 ### Manual setup
 
-Alternatively, set the environment variable:
+Alternatively, set environment variables:
 
 ```bash
 export GOOGLE_GENERATIVE_AI_API_KEY="your-api-key-here"
+export GOOGLE_GENERATIVE_AI_MODEL="gemini-2.5-flash"
 ```
 
 Or create a `.env` file in your project:
 
 ```
 GOOGLE_GENERATIVE_AI_API_KEY=your-api-key-here
+GOOGLE_GENERATIVE_AI_MODEL=gemini-2.5-flash
 ```
+
+`GOOGLE_GENERATIVE_AI_MODEL` is optional. If omitted, `gemini-2.5-flash` is used.
 
 ## Usage
 
@@ -111,7 +117,7 @@ f2md image.jpg output.md
 ```bash
 f2md --help     # Show help
 f2md --version  # Show version
-f2md setup      # Configure API key
+f2md setup      # Configure API key and model
 ```
 
 ## How It Works
@@ -120,7 +126,7 @@ f2md setup      # Configure API key
 
 1. **Extraction** - Reads the input file and extracts text, images, and layout information
 2. **Processing** - For PDFs, captures page screenshots to understand visual layout
-3. **AI Conversion** - Sends extracted content to Google's Gemini AI model
+3. **AI Conversion** - Sends extracted content to your configured Gemini model
 4. **Markdown Generation** - Receives AI-generated Markdown with proper formatting
 5. **Cleanup** - Removes unused images and saves the final output
 
@@ -178,6 +184,7 @@ import { convert } from "f2md";
 const result = await convert("input.pdf", "output.md", {
   onProgress: (message) => console.log(message),
   respectPages: false,
+  model: "gemini-2.5-flash",
 });
 
 console.log(`Saved to: ${result.outputPath}`);

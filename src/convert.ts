@@ -9,6 +9,7 @@ import mammoth from "mammoth";
 export interface ConvertOptions {
   onProgress?: (message: string) => void;
   respectPages?: boolean;
+  model?: string;
 }
 
 export interface ConvertResult {
@@ -22,7 +23,9 @@ export async function convert(
   outputPath: string,
   options: ConvertOptions = {},
 ): Promise<ConvertResult> {
-  const { onProgress = () => {}, respectPages = false } = options;
+  const { onProgress = () => {}, respectPages = false, model: configuredModel } = options;
+  const modelName =
+    configuredModel?.trim() || process.env.GOOGLE_GENERATIVE_AI_MODEL?.trim() || "gemini-2.5-flash";
 
   if (!existsSync(inputFilePath)) {
     throw new Error(`File not found: ${inputFilePath}`);
@@ -236,7 +239,7 @@ export async function convert(
   onProgress(isImageFile ? "Extracting text from image with AI..." : "Converting to markdown with AI...");
 
   const result = streamText({
-    model: google("gemini-2.5-flash"),
+    model: google(modelName),
     messages: [
       {
         role: "system",

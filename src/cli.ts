@@ -6,9 +6,27 @@ import { extname, basename, dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { convert } from "./convert";
 
-const VERSION = "1.0.0";
+const VERSION = "1.2.0";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 const SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
 const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+
+function getEnvValue(content: string, key: string): string | undefined {
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = content.match(new RegExp(`^\\s*${escapedKey}\\s*=\\s*(.+)\\s*$`, "m"));
+
+  if (!match?.[1]) {
+    return undefined;
+  }
+
+  let value = match[1].trim();
+
+  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    value = value.slice(1, -1);
+  }
+
+  return value || undefined;
+}
 
 function showHelp() {
   console.log(`
@@ -26,7 +44,7 @@ Examples:
   f2md image.png            # Extract text from image to image.md
 
 Commands:
-  setup                                 # Configure Google AI API key
+  setup                                 # Configure Google AI API key and model
 
 Options:
   -h, --help           Show this help message
@@ -40,6 +58,7 @@ Supported file types:
 
 Environment Variables:
   GOOGLE_GENERATIVE_AI_API_KEY  Required. Your Google AI API key.
+  GOOGLE_GENERATIVE_AI_MODEL    Optional. Gemini model to use (default: ${DEFAULT_MODEL}).
 `);
 }
 
@@ -53,16 +72,23 @@ async function runSetup() {
   const hasLocalEnv = existsSync(envPath);
   const hasGlobalEnv = existsSync(globalEnvPath);
 
+  let existingModel = process.env.GOOGLE_GENERATIVE_AI_MODEL || DEFAULT_MODEL;
+
   if (hasLocalEnv) {
     const fileContent = await readFile(envPath, "utf8");
-    if (fileContent.includes("GOOGLE_GENERATIVE_AI_API_KEY")) {
+    existingModel = getEnvValue(fileContent, "GOOGLE_GENERATIVE_AI_MODEL") || existingModel;
+
+    if (
+      fileContent.includes("GOOGLE_GENERATIVE_AI_API_KEY") ||
+      fileContent.includes("GOOGLE_GENERATIVE_AI_MODEL")
+    ) {
       p.note(
         `Found existing configuration in:\n${envPath}`,
         "Already configured",
       );
 
       const shouldOverwrite = await p.confirm({
-        message: "Do you want to update your API key?",
+        message: "Do you want to update your configuration?",
         initialValue: false,
       });
 
@@ -72,13 +98,16 @@ async function runSetup() {
       }
     }
   } else if (hasGlobalEnv) {
+    const fileContent = await readFile(globalEnvPath, "utf8");
+    existingModel = getEnvValue(fileContent, "GOOGLE_GENERATIVE_AI_MODEL") || existingModel;
+
     p.note(
       `Found existing global configuration in:\n${globalEnvPath}`,
       "Already configured",
     );
 
     const shouldOverwrite = await p.confirm({
-      message: "Do you want to update your API key?",
+      message: "Do you want to update your configuration?",
       initialValue: false,
     });
 
@@ -114,8 +143,24 @@ async function runSetup() {
     process.exit(0);
   }
 
+  const model = await p.text({
+    message: "Enter the Gemini model to use:",
+    placeholder: DEFAULT_MODEL,
+    defaultValue: existingModel,
+    validate: (value) => {
+      if (!value || value.trim().length === 0) {
+        return "Model name is required";
+      }
+    },
+  });
+
+  if (p.isCancel(model)) {
+    p.cancel("Setup cancelled");
+    process.exit(0);
+  }
+
   const scope = await p.select({
-    message: "Where should the API key be saved?",
+    message: "Where should this configuration be saved?",
     options: [
       {
         value: "local",
@@ -136,11 +181,11 @@ async function runSetup() {
   }
 
   const targetPath = scope === "global" ? globalEnvPath : envPath;
-  const envContent = `GOOGLE_GENERATIVE_AI_API_KEY=${apiKey}\n`;
+  const envContent = `GOOGLE_GENERATIVE_AI_API_KEY=${apiKey}\nGOOGLE_GENERATIVE_AI_MODEL=${String(model).trim()}\n`;
 
   try {
     await writeFile(targetPath, envContent);
-    p.note(`API key saved to:\n${targetPath}`, "Setup complete");
+    p.note(`Configuration saved to:\n${targetPath}`, "Setup complete");
     p.outro("You can now run: f2md document.pdf");
   } catch (error) {
     p.cancel(
@@ -152,33 +197,30 @@ async function runSetup() {
   }
 }
 
-async function getApiKey(): Promise<string | undefined> {
-  // Check environment variable
-  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    return process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-  }
+async function getConfig(): Promise<{ apiKey?: string; model: string }> {
+  let apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  let model = process.env.GOOGLE_GENERATIVE_AI_MODEL;
 
   // Check local .env
   const localEnvPath = join(process.cwd(), ".env");
   if (existsSync(localEnvPath)) {
     const content = await readFile(localEnvPath, "utf8");
-    const match = content.match(/GOOGLE_GENERATIVE_AI_API_KEY=(.+)/);
-    if (match?.[1]) {
-      return match[1].trim();
-    }
+    apiKey = apiKey || getEnvValue(content, "GOOGLE_GENERATIVE_AI_API_KEY");
+    model = model || getEnvValue(content, "GOOGLE_GENERATIVE_AI_MODEL");
   }
 
   // Check global .env
   const globalEnvPath = join(homedir(), ".f2md.env");
   if (existsSync(globalEnvPath)) {
     const content = await readFile(globalEnvPath, "utf8");
-    const match = content.match(/GOOGLE_GENERATIVE_AI_API_KEY=(.+)/);
-    if (match?.[1]) {
-      return match[1].trim();
-    }
+    apiKey = apiKey || getEnvValue(content, "GOOGLE_GENERATIVE_AI_API_KEY");
+    model = model || getEnvValue(content, "GOOGLE_GENERATIVE_AI_MODEL");
   }
 
-  return undefined;
+  return {
+    apiKey,
+    model: model || DEFAULT_MODEL,
+  };
 }
 
 async function main() {
@@ -203,7 +245,7 @@ async function main() {
   }
 
   // Check for API key before proceeding
-  const apiKey = await getApiKey();
+  const { apiKey, model } = await getConfig();
   if (!apiKey) {
     p.intro("f2md");
     p.cancel(
@@ -215,8 +257,9 @@ async function main() {
     process.exit(1);
   }
 
-  // Set the API key in the environment for the convert function
+  // Set configuration in the environment for the convert function
   process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey;
+  process.env.GOOGLE_GENERATIVE_AI_MODEL = model;
 
   p.intro("f2md");
 
@@ -305,6 +348,7 @@ async function main() {
         spinner.message(message);
       },
       respectPages,
+      model,
     });
 
     spinner.stop(`Converted ${basename(inputFilePath)}`);
